@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256px" height="256px" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 44.1 (41455) - http://www.bohemiancoding.com/sketch -->
+    <title>logo-full</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <linearGradient x1="0%" y1="100%" x2="99.1370376%" y2="0.862962372%" id="linearGradient-1">
+            <stop stop-color="#0069FF" offset="0%"></stop>
+            <stop stop-color="#0069FF" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="4-Showcase-LOGO" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="logo-full">
+            <g id="Icon---iOS">
+                <rect id="Base" fill="url(#linearGradient-1)" fill-rule="evenodd" x="0" y="0" width="256" height="256"></rect>
+                <rect id="Base" fill="url(#linearGradient-1)" fill-rule="evenodd" x="0" y="0" width="256" height="256"></rect>
+                <path d="M158.98061,115.69723 L201.402561,201.375905 C204.016518,206.655257 210.415309,208.815985 215.69466,206.202028 C220.974011,203.588071 223.13474,197.189281 220.520783,191.909929 L152.732956,55.0003562 C148.778165,47.0129532 137.352413,47.1108372 133.535048,55.1648238 L101.631299,122.476279 L93.2315561,103.65576 C89.4118145,95.0972224 77.203113,95.2720097 73.6299454,103.936389 L37.0750963,192.576252 C34.8291391,198.022351 37.4233669,204.257995 42.8694661,206.503952 C48.3155654,208.74991 54.5512092,206.155682 56.7971664,200.709583 L83.8780941,135.042516 L91.5994052,152.342936 C95.3130834,160.663828 107.076116,160.798109 110.978777,152.564162 L129.652065,113.166719 L134.529746,121.391869 L140.698366,112.921654 L148.792015,130.36378 L158.137044,115.057741 L158.98061,115.69723 Z" id="Combined-Shape" fill="#FFFFFF" fill-rule="nonzero"></path>
+            </g>
+        </g>
+    </g>
+</svg>
