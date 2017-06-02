@@ -2,8 +2,9 @@ import React, { Component } from "react";
 import "./Chat.css";
 import ChatInput from "./ChatInput";
 import ChatMessages from "./ChatMessages";
+import { graphql, compose } from "react-apollo";
+import gql from "graphql-tag";
 import Dropzone from "react-dropzone";
-import { graphql, compose, gql } from "react-apollo";
 
 const createMessage = gql`
   mutation createMessage($text: String!, $conversationId: ID!) {
@@ -43,6 +44,33 @@ const allMessages = gql`
   }
 `;
 
+const newMessageSubscription = gql`
+  subscription newMessageSubscription($conversationId: ID!) {
+    Message(filter: {
+    AND: [{
+    mutation_in: [CREATED]
+    }, {
+    node: {
+    conversation: {
+    id: $conversationId
+    }
+    }
+    }]
+    }) {
+      node {
+        id
+        text
+        createdAt
+        agent {
+          id
+          slackUserName
+          imageUrl
+        }
+      }
+    }
+  }
+`;
+
 class Chat extends Component {
   static propTypes = {
     conversationId: React.PropTypes.string.isRequired,
@@ -57,6 +85,10 @@ class Chat extends Component {
     message: "",
     isUploadingImage: false
   };
+
+  componentDidMount() {
+    this._subscribeToNewMessages(this);
+  }
 
   render() {
     if (this.props.allMessagesQuery.loading) {
@@ -111,6 +143,32 @@ class Chat extends Component {
       variables: {
         text: this.state.message,
         conversationId: this.props.conversationId
+      }
+    });
+  };
+
+  _subscribeToNewMessages = componentRef => {
+    this.newMessageSubscription = this.props.allMessagesQuery.subscribeToMore({
+      document: newMessageSubscription,
+      updateQuery: (previousState, { subscriptionData }) => {
+        const newMessage = subscriptionData.data.Message.node;
+        const messages = previousState.allMessages
+          ? [...previousState.allMessages, newMessage]
+          : [newMessage];
+        return {
+          allMessages: messages
+        };
+      },
+      variables: {
+        conversationId: this.props.conversationId
+      },
+      onError: err => {
+        console.error(
+          "Chat - An error occured while being subscribed: ",
+          err,
+          "Subscribe again"
+        );
+        componentRef._subscribeToNewMessages(componentRef);
       }
     });
   };

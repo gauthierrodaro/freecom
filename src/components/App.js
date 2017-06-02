@@ -1,12 +1,13 @@
 import React, { Component } from "react";
 import cx from "classnames";
-import { graphql, compose, gql, withApollo } from "react-apollo";
 import "./App.css";
 import Chat from "./Chat";
 import ChatHeader from "./ChatHeader";
 import ConversationsList from "./ConversationsList";
 import ConversationsListHeader from "./ConversationsListHeader";
 import ToggleOpeningStateButton from "./ToggleOpeningStateButton";
+import { graphql, compose, withApollo } from "react-apollo";
+import gql from "graphql-tag";
 import {
   timeDifferenceForDate,
   sortConversationByDateCreated,
@@ -19,9 +20,13 @@ import {
   MAX_USERNAME_LENGTH
 } from "../constants";
 
-const createCustomerAndFirstConvesation = gql`
+const createCustomerAndFirstConversation = gql`
   mutation createCustomer($name: String!) {
-    createCustomer(name: $name, conversations: [{ slackChannelIndex: 1 }]) {
+    createCustomer(name: $name, conversations: [
+      {
+        slackChannelIndex: 1,
+      }
+    ]) {
       id
       name
       conversations {
@@ -49,7 +54,7 @@ const findConversations = gql`
       customer: {
         id: $customerId
       }
-    }) {
+    }){
       id
       updatedAt
       slackChannelIndex
@@ -69,7 +74,9 @@ const findConversations = gql`
 
 const createConversation = gql`
   mutation createConversation($customerId: ID!, $slackChannelIndex: Int!) {
-    createConversation(customerId: $customerId, slackChannelIndex: $slackChannelIndex) {
+    createConversation(
+    customerId: $customerId, 
+    slackChannelIndex: $slackChannelIndex) {
       id
       updatedAt
       slackChannelIndex
@@ -87,8 +94,42 @@ const createConversation = gql`
   }
 `;
 
+const newMessageSubscription = gql`
+  subscription {
+    Message(filter: {
+    mutation_in: [CREATED]
+    }) {
+      node {
+        id
+        text
+        createdAt
+        conversation {
+          id
+          updatedAt
+          slackChannelIndex
+          agent {
+            id
+            slackUserName
+            imageUrl
+            messages(last: 1) {
+              id
+              createdAt
+            }
+          }
+          messages(last: 1) {
+            id
+            text
+            createdAt
+          }
+        }
+      }
+    }
+  }
+`;
 
 class App extends Component {
+  _timer = null;
+
   state = {
     isOpen: false,
     selectedConversationId: null,
@@ -112,6 +153,8 @@ class App extends Component {
       // customer doesn't exist yet, create new
       this._setupNewCustomer();
     }
+
+    this._subscribeToNewMessages(this);
   }
 
   render() {
@@ -205,19 +248,48 @@ class App extends Component {
     );
   };
 
+  _subscribeToNewMessages = componentRef => {
+    this.newMessageObserver = this.props.client
+      .subscribe({
+        query: newMessageSubscription
+      })
+      .subscribe({
+        next: this._handleNewMessage,
+        error(error) {
+          console.error(
+            "App - Subscription callback with error: ",
+            error,
+            "Subscribe again"
+          );
+          componentRef._subscribeToNewMessages(componentRef);
+        }
+      });
+  };
+
+  _handleNewMessage = data => {
+    const conversationOfNewMessage = data.Message.node.conversation;
+    const newConversations = [...this.state.conversations];
+    const indexOfConversationToUpdate = newConversations.findIndex(
+      c => c.id === conversationOfNewMessage.id
+    );
+    newConversations[indexOfConversationToUpdate] = conversationOfNewMessage;
+    newConversations.sort(sortConversationByDateCreated);
+    this.setState({ conversations: newConversations });
+  };
+
   _setupNewCustomer = async () => {
     const username = generateShortStupidName(MAX_USERNAME_LENGTH);
-    const result = await this.props.createCustomerAndFirstConvesationMutation({
+    const result = await this.props.createCustomerAndFirstConversationMutation({
       variables: {
         name: username
       }
     });
-    const { id: customerId, conversations } = result.data.createCustomer;
+    const customerId = result.data.createCustomer.id;
     localStorage.setItem(FREECOM_CUSTOMER_ID_KEY, customerId);
     localStorage.setItem(FREECOM_CUSTOMER_NAME_KEY, username);
     this.setState({
-      conversations,
-      selectedConversationId: conversations[0].id
+      conversations: result.data.createCustomer.conversations,
+      selectedConversationId: result.data.createCustomer.conversations[0].id
     });
   };
 
@@ -230,9 +302,11 @@ class App extends Component {
     });
     const sortedConversations = findConversationsResult.data.allConversations.slice();
     sortedConversations.sort(sortConversationByDateCreated);
+
     const shouldOpenEmptyConversation =
       sortedConversations.length === 1 &&
       sortedConversations[0].messages.length === 0;
+
     this.setState({
       conversations: sortedConversations,
       selectedConversationId: shouldOpenEmptyConversation
@@ -241,25 +315,42 @@ class App extends Component {
     });
   };
 
-  _initiateNewConversation = () => {};
+  _initiateNewConversation = () => {
+    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY);
+    const username = localStorage.getItem(FREECOM_CUSTOMER_NAME_KEY);
+    const emptyConversation = this.state.conversations.find(
+      c => c.messages.length === 0
+    );
+    if (emptyConversation) {
+      this.setState({ selectedConversationId: emptyConversation.id });
+    } else {
+      this._createNewConversation(customerId, username);
+    }
+  };
 
   _createNewConversation = async (customerId, username) => {
-    const channelPositions = this.state.conversations.map(c => c.slackChannelIndex)
-    const newChannelPosition = channelPositions.length === 0 ? 1 : Math.max.apply(null, channelPositions) + 1
+    const channelPositions = this.state.conversations.map(
+      c => c.slackChannelIndex
+    );
+    const newChannelPosition = channelPositions.length === 0
+      ? 1
+      : Math.max.apply(null, channelPositions) + 1;
 
     // create new conversation for the customer
     const result = await this.props.createConversationMutation({
       variables: {
         customerId: customerId,
-        slackChannelIndex: newChannelPosition,
+        slackChannelIndex: newChannelPosition
       }
-    })
-    const conversationId = result.data.createConversation.id
-    const newConversations = this.state.conversations.concat([result.data.createConversation])
+    });
+    const conversationId = result.data.createConversation.id;
+    const newConversations = this.state.conversations.concat([
+      result.data.createConversation
+    ]);
     this.setState({
       conversations: newConversations,
-      selectedConversationId: conversationId,
-    })
+      selectedConversationId: conversationId
+    });
   };
 
   _onSelectConversation = conversation => {
@@ -279,7 +370,9 @@ class App extends Component {
 
 const appWithMutations = compose(
   graphql(createConversation, { name: "createConversationMutation" }),
-  graphql(createCustomerAndFirstConvesation, { name: "createCustomerAndFirstConvesationMutation" }),
+  graphql(createCustomerAndFirstConversation, {
+    name: "createCustomerAndFirstConversationMutation"
+  })
 )(App);
 
 export default withApollo(appWithMutations);

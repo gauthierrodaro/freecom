@@ -11,7 +11,8 @@
     "react-dom": "^15.5.4",
     "react-dropzone": "^3.13.1",
     "react-textarea-autosize": "^5.0.6",
-    "sillyname": "^0.1.0"
+    "sillyname": "^0.1.0",
+    "subscriptions-transport-ws": "^0.7.0"
   },
   "devDependencies": {
     "react-scripts": "1.0.6"
