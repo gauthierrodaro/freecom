@@ -1,32 +1,42 @@
-import React, { Component } from "react";
-import cx from "classnames";
-import "./App.css";
-import Chat from "./Chat";
-import ChatHeader from "./ChatHeader";
-import ConversationsList from "./ConversationsList";
-import ConversationsListHeader from "./ConversationsListHeader";
-import ToggleOpeningStateButton from "./ToggleOpeningStateButton";
-import { graphql, compose, withApollo } from "react-apollo";
-import gql from "graphql-tag";
+import React, { Component } from "react"
+import cx from "classnames"
+import "./App.css"
+import Chat from "./Chat"
+import ChatHeader from "./ChatHeader"
+import ConversationsList from "./ConversationsList"
+import ConversationsListHeader from "./ConversationsListHeader"
+import ToggleOpeningStateButton from "./ToggleOpeningStateButton"
+import { graphql, compose, withApollo } from "react-apollo"
+import gql from "graphql-tag"
 import {
   timeDifferenceForDate,
   sortConversationByDateCreated,
   generateShortStupidName
-} from "../utils";
+} from "../utils"
 import {
   TEST_WITH_NEW_CUSTOMER,
   FREECOM_CUSTOMER_ID_KEY,
   FREECOM_CUSTOMER_NAME_KEY,
-  MAX_USERNAME_LENGTH
-} from "../constants";
+  MAX_USERNAME_LENGTH,
+  FREECOM_AUTH_TOKEN_KEY,
+  FREECOM_CUSTOMER_SECRET_KEY
+} from "../constants"
+import cuid from "cuid"
 
-const createCustomerAndFirstConversation = gql`
-  mutation createCustomer($name: String!) {
-    createCustomer(name: $name, conversations: [
-      {
-        slackChannelIndex: 1,
-      }
-    ]) {
+const createAuthenticatedCustomer = gql`
+  mutation authenticateAnonymousCustomer($secret: String!) {
+    authenticateAnonymousCustomer(secret: $secret) {
+      id
+      token
+    }
+  }
+`
+
+const initializeCustomer = gql`
+  mutation($name: String!, $customerId: ID!) {
+    updateCustomer(id: $customerId, name: $name, conversations: [{
+      slackChannelIndex: 1
+    }]) {
       id
       name
       conversations {
@@ -46,7 +56,7 @@ const createCustomerAndFirstConversation = gql`
       }
     }
   }
-`;
+`
 
 const findConversations = gql`
   query allConversations($customerId: ID!) {
@@ -70,12 +80,12 @@ const findConversations = gql`
       }
     }
   }
-`;
+`
 
 const createConversation = gql`
   mutation createConversation($customerId: ID!, $slackChannelIndex: Int!) {
     createConversation(
-    customerId: $customerId, 
+    customerId: $customerId,
     slackChannelIndex: $slackChannelIndex) {
       id
       updatedAt
@@ -92,12 +102,11 @@ const createConversation = gql`
       }
     }
   }
-`;
+`
 
 const newMessageSubscription = gql`
   subscription {
     Message(filter: {
-    mutation_in: [CREATED]
     }) {
       node {
         id
@@ -125,44 +134,46 @@ const newMessageSubscription = gql`
       }
     }
   }
-`;
+`
 
 class App extends Component {
-  _timer = null;
+  _timer = null
 
   state = {
-    isOpen: false,
+    isOpen: true,
     selectedConversationId: null,
     conversations: []
-  };
+  }
 
   async componentDidMount() {
     // TESTING
     if (TEST_WITH_NEW_CUSTOMER) {
-      localStorage.removeItem(FREECOM_CUSTOMER_ID_KEY);
-      localStorage.removeItem(FREECOM_CUSTOMER_NAME_KEY);
+      localStorage.removeItem(FREECOM_CUSTOMER_ID_KEY)
+      localStorage.removeItem(FREECOM_CUSTOMER_NAME_KEY)
+      localStorage.removeItem(FREECOM_CUSTOMER_SECRET_KEY)
+      localStorage.removeItem(FREECOM_AUTH_TOKEN_KEY)
     }
 
-    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY);
-    const username = localStorage.getItem(FREECOM_CUSTOMER_NAME_KEY);
+    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY)
+    const username = localStorage.getItem(FREECOM_CUSTOMER_NAME_KEY)
 
     if (customerId && username) {
       // customer already exists, find all conversations for that customer
-      this._loadConversations(customerId);
+      this._loadConversations(customerId)
     } else {
       // customer doesn't exist yet, create new
-      this._setupNewCustomer();
+      this._setupNewCustomer()
     }
 
-    this._subscribeToNewMessages(this);
+    this._subscribeToNewMessages(this)
   }
 
   render() {
-    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY);
-    const shouldRenderChat = this.state.selectedConversationId && customerId;
+    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY)
+    const shouldRenderChat = this.state.selectedConversationId && customerId
     const panelStyles = cx(
       `panel drop-shadow radius overflow-hidden ${this.state.isOpen ? "fadeInUp" : "hide"}`
-    );
+    )
     return (
       <div className="App">
         <div>
@@ -180,7 +191,7 @@ class App extends Component {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   _renderConversationsList = () => {
@@ -207,22 +218,22 @@ class App extends Component {
           </div>
         </div>
       </span>
-    );
-  };
+    )
+  }
 
   _renderChat = customerId => {
-    const { freecom } = this.props;
+    const { freecom } = this.props
     const selectedConversation = this.state.conversations.find(
       c => c.id === this.state.selectedConversationId
-    );
-    const { agent } = selectedConversation;
+    )
+    const { agent } = selectedConversation
     const chatPartnerName = agent
       ? selectedConversation.agent.slackUserName
-      : freecom.companyName;
+      : freecom.companyName
     const profileImageUrl = agent && agent.imageUrl
       ? agent.imageUrl
-      : freecom.companyLogoURL;
-    const created = timeDifferenceForDate(selectedConversation.updatedAt);
+      : freecom.companyLogoURL
+    const created = timeDifferenceForDate(selectedConversation.updatedAt)
     return (
       <span>
         <ChatHeader
@@ -245,8 +256,8 @@ class App extends Component {
           profileImageURL={freecom.companyLogoURL}
         />
       </span>
-    );
-  };
+    )
+  }
 
   _subscribeToNewMessages = componentRef => {
     this.newMessageObserver = this.props.client
@@ -260,38 +271,56 @@ class App extends Component {
             "App - Subscription callback with error: ",
             error,
             "Subscribe again"
-          );
-          componentRef._subscribeToNewMessages(componentRef);
+          )
+          componentRef._subscribeToNewMessages(componentRef)
         }
-      });
-  };
+      })
+  }
 
   _handleNewMessage = data => {
-    const conversationOfNewMessage = data.Message.node.conversation;
-    const newConversations = [...this.state.conversations];
+    const conversationOfNewMessage = data.Message.node.conversation
+    const newConversations = [...this.state.conversations]
     const indexOfConversationToUpdate = newConversations.findIndex(
       c => c.id === conversationOfNewMessage.id
-    );
-    newConversations[indexOfConversationToUpdate] = conversationOfNewMessage;
-    newConversations.sort(sortConversationByDateCreated);
-    this.setState({ conversations: newConversations });
-  };
+    )
+    newConversations[indexOfConversationToUpdate] = conversationOfNewMessage
+    newConversations.sort(sortConversationByDateCreated)
+    this.setState({ conversations: newConversations })
+  }
 
   _setupNewCustomer = async () => {
-    const username = generateShortStupidName(MAX_USERNAME_LENGTH);
-    const result = await this.props.createCustomerAndFirstConversationMutation({
+    // authentication
+    const secret = cuid()
+    localStorage.setItem(FREECOM_CUSTOMER_SECRET_KEY, secret)
+    const authenticationResult = await this.props.createAuthenticatedCustomerMutation(
+      {
+        variables: { secret }
+      }
+    )
+    const authToken =
+      authenticationResult.data.authenticateAnonymousCustomer.token
+    const customerId =
+      authenticationResult.data.authenticateAnonymousCustomer.id
+    console.log(localStorage.setItem(FREECOM_AUTH_TOKEN_KEY, authToken))
+    localStorage.setItem(FREECOM_AUTH_TOKEN_KEY, authToken)
+    console.log(localStorage.getItem(FREECOM_AUTH_TOKEN_KEY))
+    localStorage.setItem(FREECOM_CUSTOMER_ID_KEY, customerId)
+
+    // initialization
+    const username = generateShortStupidName(MAX_USERNAME_LENGTH)
+    const result = await this.props.initializeCustomerMutation({
       variables: {
+        customerId,
         name: username
       }
-    });
-    const customerId = result.data.createCustomer.id;
-    localStorage.setItem(FREECOM_CUSTOMER_ID_KEY, customerId);
-    localStorage.setItem(FREECOM_CUSTOMER_NAME_KEY, username);
+    })
+    localStorage.setItem(FREECOM_CUSTOMER_NAME_KEY, username)
+
     this.setState({
-      conversations: result.data.createCustomer.conversations,
-      selectedConversationId: result.data.createCustomer.conversations[0].id
-    });
-  };
+      conversations: result.data.updateCustomer.conversations,
+      selectedConversationId: result.data.updateCustomer.conversations[0].id
+    })
+  }
 
   _loadConversations = async customerId => {
     const findConversationsResult = await this.props.client.query({
@@ -299,42 +328,42 @@ class App extends Component {
       variables: {
         customerId
       }
-    });
-    const sortedConversations = findConversationsResult.data.allConversations.slice();
-    sortedConversations.sort(sortConversationByDateCreated);
+    })
+    const sortedConversations = findConversationsResult.data.allConversations.slice()
+    sortedConversations.sort(sortConversationByDateCreated)
 
     const shouldOpenEmptyConversation =
       sortedConversations.length === 1 &&
-      sortedConversations[0].messages.length === 0;
+      sortedConversations[0].messages.length === 0
 
     this.setState({
       conversations: sortedConversations,
       selectedConversationId: shouldOpenEmptyConversation
         ? sortedConversations[0].id
         : null
-    });
-  };
+    })
+  }
 
   _initiateNewConversation = () => {
-    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY);
-    const username = localStorage.getItem(FREECOM_CUSTOMER_NAME_KEY);
+    const customerId = localStorage.getItem(FREECOM_CUSTOMER_ID_KEY)
+    const username = localStorage.getItem(FREECOM_CUSTOMER_NAME_KEY)
     const emptyConversation = this.state.conversations.find(
       c => c.messages.length === 0
-    );
+    )
     if (emptyConversation) {
-      this.setState({ selectedConversationId: emptyConversation.id });
+      this.setState({ selectedConversationId: emptyConversation.id })
     } else {
-      this._createNewConversation(customerId, username);
+      this._createNewConversation(customerId, username)
     }
-  };
+  }
 
   _createNewConversation = async (customerId, username) => {
     const channelPositions = this.state.conversations.map(
       c => c.slackChannelIndex
-    );
+    )
     const newChannelPosition = channelPositions.length === 0
       ? 1
-      : Math.max.apply(null, channelPositions) + 1;
+      : Math.max.apply(null, channelPositions) + 1
 
     // create new conversation for the customer
     const result = await this.props.createConversationMutation({
@@ -342,37 +371,38 @@ class App extends Component {
         customerId: customerId,
         slackChannelIndex: newChannelPosition
       }
-    });
-    const conversationId = result.data.createConversation.id;
+    })
+    const conversationId = result.data.createConversation.id
     const newConversations = this.state.conversations.concat([
       result.data.createConversation
-    ]);
+    ])
     this.setState({
       conversations: newConversations,
       selectedConversationId: conversationId
-    });
-  };
+    })
+  }
 
   _onSelectConversation = conversation => {
     this.setState({
       selectedConversationId: conversation.id
-    });
-  };
+    })
+  }
 
   _resetConversation = () => {
     this.setState({
       selectedConversationId: null
-    });
-  };
+    })
+  }
 
-  _togglePanel = () => this.setState({ isOpen: !this.state.isOpen });
+  _togglePanel = () => this.setState({ isOpen: !this.state.isOpen })
 }
 
 const appWithMutations = compose(
   graphql(createConversation, { name: "createConversationMutation" }),
-  graphql(createCustomerAndFirstConversation, {
-    name: "createCustomerAndFirstConversationMutation"
-  })
-)(App);
+  graphql(createAuthenticatedCustomer, {
+    name: "createAuthenticatedCustomerMutation"
+  }),
+  graphql(initializeCustomer, { name: "initializeCustomerMutation" })
+)(App)
 
-export default withApollo(appWithMutations);
+export default withApollo(appWithMutations)

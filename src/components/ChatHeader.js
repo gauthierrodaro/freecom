@@ -1,9 +1,9 @@
-import React, { Component } from "react";
-import "./ChatHeader.css";
-import "./App.css";
-import gql from "graphql-tag";
-import { graphql } from "react-apollo";
-import { timeDifferenceForDate } from "../utils";
+import React, { Component } from "react"
+import "./ChatHeader.css"
+import "./App.css"
+import gql from "graphql-tag"
+import { graphql } from "react-apollo"
+import { timeDifferenceForDate } from "../utils"
 
 const lastMessageOfCurrentAgent = gql`
   query lastMessageOfCurrentAgent($agentId: ID!) {
@@ -15,11 +15,11 @@ const lastMessageOfCurrentAgent = gql`
       }
     }
   }
-`;
+`
 
 class ChatHeader extends Component {
   render() {
-    const headerSubtitle = this._generateHeaderSubtitle();
+    const headerSubtitle = this._generateHeaderSubtitle()
     return (
       <div
         style={{ backgroundColor: this.props.headerColor }}
@@ -44,29 +44,29 @@ class ChatHeader extends Component {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   _generateHeaderSubtitle = () => {
-    let headerSubtitle = "";
+    let headerSubtitle = ""
     if (
       this.props.lastMessageOfCurrentAgentQuery &&
       !this.props.lastMessageOfCurrentAgentQuery.loading
     ) {
       const lastMessage = this.props.lastMessageOfCurrentAgentQuery.Agent
-        .messages[0];
+        .messages[0]
       headerSubtitle =
-        "Last active " + timeDifferenceForDate(lastMessage.createdAt);
+        "Last active " + timeDifferenceForDate(lastMessage.createdAt)
     } else {
-      headerSubtitle = "Created " + this.props.created;
+      headerSubtitle = "Created " + this.props.created
     }
-    return headerSubtitle;
-  };
+    return headerSubtitle
+  }
 }
 
 export default graphql(lastMessageOfCurrentAgent, {
   skip: ownProps => {
-    return !Boolean(ownProps.agentId);
+    return !Boolean(ownProps.agentId)
   },
   name: "lastMessageOfCurrentAgentQuery"
-})(ChatHeader);
+})(ChatHeader)

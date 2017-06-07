@@ -1,27 +1,28 @@
-import React, { Component} from 'react'
-import './ConversationItem.css'
-import { timeDifferenceForDate } from '../utils'
+import React, { Component } from "react"
+import "./ConversationItem.css"
+import { timeDifferenceForDate } from "../utils"
 
 class ConversationItem extends Component {
-
   render() {
-    const {ago, messageText, chatPartnerName, profileImageUrl} = this._previewForMessage()
+    const {
+      ago,
+      messageText,
+      chatPartnerName,
+      profileImageUrl
+    } = this._previewForMessage()
     return (
       <div
-        className='conversation interior-padding fadeInLeft pointer hover-gray'
+        className="conversation interior-padding fadeInLeft pointer hover-gray"
         onClick={() => this.props.onSelectConversation(this.props.conversation)}
       >
-        <div className='flex'>
-          <img
-            src={profileImageUrl}
-            alt=''
-            className='avatar'></img>
-          <div className='conversation-text-padding full-width'>
-            <div className='flex'>
-              <p className='full-width opacity-6'>{chatPartnerName}</p>
-              <p className='opaque conversation-ago'>{ago}</p>
+        <div className="flex">
+          <img src={profileImageUrl} alt="" className="avatar" />
+          <div className="conversation-text-padding full-width">
+            <div className="flex">
+              <p className="full-width opacity-6">{chatPartnerName}</p>
+              <p className="opaque conversation-ago">{ago}</p>
             </div>
-            <p className='full-width opacity-8'>{messageText}</p>
+            <p className="full-width opacity-8">{messageText}</p>
           </div>
         </div>
       </div>
@@ -34,24 +35,25 @@ class ConversationItem extends Component {
     let messageText
     if (message) {
       ago = timeDifferenceForDate(message.createdAt)
-      messageText = message.text.split('').length > 32 ?
-        message.text.split('').splice(0,32).join('') + '...' : message.text
+      messageText = message.text.split("").length > 32
+        ? message.text.split("").splice(0, 32).join("") + "..."
+        : message.text
     } else {
-      ago = ''
-      messageText = 'Start a new conversation'
+      ago = ""
+      messageText = "Start a new conversation"
     }
 
-    const chatPartnerName = this.props.conversation.agent ?
-      this.props.conversation.agent.slackUserName :
-      this.props.companyName
+    const chatPartnerName = this.props.conversation.agent
+      ? this.props.conversation.agent.slackUserName
+      : this.props.companyName
 
-    const profileImageUrl =  this.props.conversation.agent && this.props.conversation.agent.imageUrl ?
-      this.props.conversation.agent.imageUrl :
-      this.props.companyLogoURL
+    const profileImageUrl = this.props.conversation.agent &&
+      this.props.conversation.agent.imageUrl
+      ? this.props.conversation.agent.imageUrl
+      : this.props.companyLogoURL
 
-    return {ago, messageText, chatPartnerName, profileImageUrl}
+    return { ago, messageText, chatPartnerName, profileImageUrl }
   }
-
 }
 
 export default ConversationItem
